@@ -1,0 +1,38 @@
+#!/bin/bash
+
+HOME_WIFI_SSID="Skynet"
+if [ ! -f "/tmp/disable" ]
+then
+    ##Check if at home
+    wifi_ssid_name=`/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport -I  | sed 's/ //g' | grep "^SSID" | cut -d':' -f2`
+    if [ "$wifi_ssid_name" = "$HOME_WIFI_SSID" ]
+    then
+        echo "Connected to $HOME_WIFI_SSID!"
+        ## Check if on work VPN
+        connected=`/opt/cisco/anyconnect/bin/vpn stats | grep " Connected" | wc -l`
+        if [ $connected -eq 0 ]
+        then
+            echo "Not on work VPN"
+            tunnelblick_connected=`osascript -e "tell application \"/Applications/Tunnelblick.app\"" -e "get state of configurations" -e "end tell" | grep "CONNECTED" | wc -l`
+            if [ $tunnelblick_connected -eq 0 ]
+            then
+                VPN_endpoints=`osascript -e "tell application \"/Applications/Tunnelblick.app\"" -e "get configurations" -e "end tell" | sed 's/,//g' | sed 's/configuration //g'`
+                VPN_endpoints_array=($VPN_endpoints)
+                VPN_endpoints_array_length=${#VPN_endpoints_array[@]}
+                random_number=$(( ( RANDOM % VPN_endpoints_array_length )  + 1 ))
+                echo "Connecting to ProtonVPN...."
+                connected=`osascript -e "tell application \"/Applications/Tunnelblick.app\"" -e "connect \"${VPN_endpoints_array[$random_number]}\"" -e "end tell"`
+                if [ "$connected" = "true" ]
+                then
+                    echo "Connected to ProtonVPN"
+                else
+                    echo "Failed to connect to ProtonVPN"
+                fi
+            else
+                echo "Already connected to ProtonVPN"
+            fi
+        fi
+    else
+        echo "Not connected to Skynet!"
+    fi
+fi
